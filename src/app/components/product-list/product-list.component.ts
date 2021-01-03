@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import {Component, OnInit} from '@angular/core';
 import {ProductService} from "../../services/product.service";
 import {Product} from "../../common/product";
 import {ActivatedRoute} from "@angular/router";
@@ -10,15 +10,23 @@ import {ActivatedRoute} from "@angular/router";
 })
 export class ProductListComponent implements OnInit {
 
-  products: Product[];
-  currentCategoryId: number;
-  searchMode: boolean;
+  products: Product[] = [];
+  currentCategoryId: number = 1;
+  previousCategoryId: number = 1;
+  searchMode: boolean = false;
+
+  // new properties for pagination
+  thePageNumber: number = 1;
+  thePageSize: number = 5;
+  theTotalElements: number = 0;
+
 
   constructor(private productService: ProductService,
-              private route: ActivatedRoute) { }
+              private route: ActivatedRoute) {
+  }
 
   ngOnInit() {
-    this.route.paramMap.subscribe(()=>{
+    this.route.paramMap.subscribe(() => {
       this.listProducts();
     });
 
@@ -30,13 +38,9 @@ export class ProductListComponent implements OnInit {
 
     if (this.searchMode) {
       this.handleSearchProducts();
-    }
-    else {
+    } else {
       this.handleListProducts();
     }
-
-    this.handleListProducts();
-
   }
 
   handleSearchProducts() {
@@ -56,22 +60,48 @@ export class ProductListComponent implements OnInit {
     // check if "id" parameter is available
     const hasCategoryId: boolean = this.route.snapshot.paramMap.has('id')
 
-    if(hasCategoryId) {
+    if (hasCategoryId) {
       // get the "id" param string. convert string to a number using the "+" symbol
       this.currentCategoryId = +this.route.snapshot.paramMap.get('id');
-    }
-    else {
+    } else {
       // not category id available ... default to category id 1
       this.currentCategoryId = 1;
     }
 
-    // now get the products for the given category id
+    // Check if we have a different category than previous
 
-    this.productService.getProductList(this.currentCategoryId).subscribe(
-      data => {
-        this.products = data;
-      }
-    )
+
+    // if we have a different category id than previous
+    // then set thePageNumber back to 1
+    if (this.previousCategoryId != this.currentCategoryId) {
+      this.thePageNumber = 1;
+    }
+
+    this.previousCategoryId = this.currentCategoryId;
+
+    console.log(`currentCategoryId=${this.currentCategoryId}, thePageNumber=${this.thePageNumber}`);
+
+    // now get the products for the given category id
+    this.productService.getProductListPaginate(
+      this.thePageNumber - 1,
+      this.thePageSize,
+      this.currentCategoryId)
+      .subscribe(this.processResult());
+  }
+
+  processResult() {
+    return data => {
+      this.products = data._embedded.products;
+      this.thePageNumber = data.page.number + 1;
+      this.thePageSize = data.page.size;
+      this.theTotalElements = data.page.totalElements;
+    };
+  }
+
+  updatePageSize(pageSize: number) {
+    this.thePageSize = pageSize;
+    this.thePageNumber = 1;
+    this.listProducts();
   }
 
 }
